@@ -11,7 +11,7 @@ use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket}
 use crate::io_source::IoSource;
 #[cfg(not(target_os = "wasi"))]
 use crate::sys::tcp::{connect, new_for_addr};
-use crate::{event, Interest, Registry, Token};
+use crate::{event, Interest, Registry, sys, Token};
 
 /// A non-blocking TCP stream between a local socket and a remote socket.
 ///
@@ -46,10 +46,16 @@ use crate::{event, Interest, Registry, Token};
 /// # }
 /// ```
 pub struct TcpStream {
-    inner: IoSource<net::TcpStream>,
+    inner: IoSource<sys::tcp::TcpStream>,
 }
 
 impl TcpStream {
+    pub(crate) fn internal_new(stream: sys::tcp::TcpStream) -> TcpStream {
+        TcpStream {
+            inner: IoSource::new(stream),
+        }
+    }
+
     /// Create a new TCP stream and issue a non-blocking connect to the
     /// specified address.
     ///
@@ -82,13 +88,27 @@ impl TcpStream {
     /// [write interest]: Interest::WRITABLE
     #[cfg(not(target_os = "wasi"))]
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
-        let socket = new_for_addr(addr)?;
-        #[cfg(unix)]
-        let stream = unsafe { TcpStream::from_raw_fd(socket) };
-        #[cfg(windows)]
-        let stream = unsafe { TcpStream::from_raw_socket(socket as _) };
-        connect(&stream.inner, addr)?;
-        Ok(stream)
+
+        #[cfg(not(target_env = "sgx"))] {
+            let socket = new_for_addr(addr)?;
+            #[cfg(unix)]
+                let stream = unsafe { TcpStream::from_raw_fd(socket) };
+            #[cfg(windows)]
+                let stream = unsafe { TcpStream::from_raw_socket(socket as _) };
+            connect(&stream.inner, addr)?;
+            Ok(stream)
+        }
+        #[cfg(target_env = "sgx")] {
+            sys::tcp::connect(addr).map(TcpStream::internal_new)
+        }
+
+    }
+
+    /// Create a new TCP stream and issue a non-blocking connect to the
+    /// specified address.
+    #[cfg(target_env = "sgx")]
+    pub fn connect_str(addr: &str) -> io::Result<TcpStream> {
+        sys::tcp::connect_str(addr).map(TcpStream::internal_new)
     }
 
     /// Creates a new `TcpStream` from a standard `net::TcpStream`.
@@ -104,9 +124,7 @@ impl TcpStream {
     /// should already be connected via some other means (be it manually, or
     /// the standard library).
     pub fn from_std(stream: net::TcpStream) -> TcpStream {
-        TcpStream {
-            inner: IoSource::new(stream),
-        }
+        TcpStream::internal_new(stream)
     }
 
     /// Returns the socket address of the remote peer of this TCP connection.

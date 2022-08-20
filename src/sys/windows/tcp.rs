@@ -7,7 +7,8 @@ use windows_sys::Win32::Networking::WinSock::{
 };
 
 use crate::sys::windows::net::{init, new_socket, socket_addr};
-
+pub(crate) type TcpListener = net::TcpListener;
+pub(crate) type TcpStream = net::TcpStream;
 pub(crate) fn new_for_addr(address: SocketAddr) -> io::Result<SOCKET> {
     init();
     let domain = match address {

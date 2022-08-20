@@ -5,7 +5,8 @@ use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use crate::sys::unix::net::{new_socket, socket_addr, to_socket_addr};
-
+pub(crate) type TcpListener = net::TcpListener;
+pub(crate) type TcpStream = net::TcpStream;
 pub(crate) fn new_for_addr(address: SocketAddr) -> io::Result<libc::c_int> {
     let domain = match address {
         SocketAddr::V4(_) => libc::AF_INET,
@@ -51,7 +52,7 @@ pub(crate) fn set_reuseaddr(socket: &net::TcpListener, reuseaddr: bool) -> io::R
     Ok(())
 }
 
-pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream, SocketAddr)> {
+pub(crate) fn accept(listener: &TcpListener) -> io::Result<(TcpStream, SocketAddr)> {
     let mut addr: MaybeUninit<libc::sockaddr_storage> = MaybeUninit::uninit();
     let mut length = size_of::<libc::sockaddr_storage>() as libc::socklen_t;
 
@@ -78,7 +79,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
             &mut length,
             libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
         ))
-        .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
+        .map(|socket| unsafe { TcpStream::from_raw_fd(socket) })
     }?;
 
     // But not all platforms have the `accept4(2)` call. Luckily BSD (derived)
@@ -96,7 +97,7 @@ pub(crate) fn accept(listener: &net::TcpListener) -> io::Result<(net::TcpStream,
             addr.as_mut_ptr() as *mut _,
             &mut length
         ))
-        .map(|socket| unsafe { net::TcpStream::from_raw_fd(socket) })
+        .map(|socket| unsafe { TcpStream::from_raw_fd(socket) })
         .and_then(|s| {
             syscall!(fcntl(s.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC))?;
 

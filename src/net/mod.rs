@@ -29,8 +29,10 @@ mod tcp;
 pub use self::tcp::{TcpListener, TcpStream};
 
 #[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_env = "sgx"))]
 mod udp;
 #[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_env = "sgx"))]
 pub use self::udp::UdpSocket;
 
 #[cfg(unix)]

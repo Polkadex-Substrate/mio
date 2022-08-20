@@ -8,7 +8,9 @@ use std::time::Duration;
 use std::{fmt, io};
 
 use mio::event::Source;
-use mio::net::{TcpListener, TcpStream, UdpSocket};
+use mio::net::{TcpListener, TcpStream};
+#[cfg(not(target_env = "sgx"))]
+use mio::net::{ UdpSocket};
 use mio::{event, Events, Interest, Poll, Registry, Token};
 
 mod util;
